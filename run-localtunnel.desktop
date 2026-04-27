@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Run Localtunnel (newsr-app)
+Exec=/bin/bash -c 'cd "%k" && ./scripts/run-localtunnel-desktop.sh'
+Icon=network-workgroup
+Terminal=false
+Categories=Development;Web;
+Path=/home/yuuta/Downloads/newsr-app
