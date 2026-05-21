@@ -1,5 +1,6 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import InventoryTable from "./InventoryTable";
+import { inventoryService } from "../data/inventoryService";
 
 const buildImage = (label, bg) => {
   const svg = `
@@ -21,51 +22,8 @@ const readFileAsDataUrl = (file) =>
     reader.readAsDataURL(file);
   });
 
-const baseItems = [
-  {
-    id: 1,
-    sku: "RFL-101",
-    name: "Basmati Rice 5kg",
-    costPrice: 14.2,
-    sellingPrice: 18.5,
-    stock: 24,
-    reorderLevel: 15,
-    image: buildImage("Rice", "#fde68a"),
-  },
-  {
-    id: 2,
-    sku: "RFL-102",
-    name: "Sunflower Oil 1L",
-    costPrice: 4.25,
-    sellingPrice: 5.75,
-    stock: 72,
-    reorderLevel: 20,
-    image: buildImage("Oil", "#fef3c7"),
-  },
-  {
-    id: 3,
-    sku: "RFL-103",
-    name: "Whole Wheat Flour 2kg",
-    costPrice: 3.5,
-    sellingPrice: 4.9,
-    stock: 9,
-    reorderLevel: 12,
-    image: buildImage("Flour", "#f5deb8"),
-  },
-  {
-    id: 4,
-    sku: "RFL-104",
-    name: "Black Tea 500g",
-    costPrice: 4.7,
-    sellingPrice: 6.4,
-    stock: 11,
-    reorderLevel: 10,
-    image: buildImage("Tea", "#fecaca"),
-  },
-];
-
 function InventoryPage() {
-  const [items, setItems] = useState(baseItems);
+  const [items, setItems] = useState([]);
   const [form, setForm] = useState({
     sku: "",
     name: "",
@@ -76,14 +34,27 @@ function InventoryPage() {
     reorderLevel: "",
     image: "",
   });
+  const [error, setError] = useState("");
+  const [shopCode, setShopCode] = useState("default");
+  const [importMode, setImportMode] = useState("merge");
   const [autoPricing, setAutoPricing] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [draft, setDraft] = useState({ name: "", costPrice: "", sellingPrice: "", stock: "" });
 
-  const lowStockCount = useMemo(
-    () => items.filter((item) => item.stock <= item.reorderLevel).length,
-    [items],
-  );
+  const loadItems = async () => {
+    try {
+      const loaded = await inventoryService.list(shopCode);
+      setItems(loaded || []);
+    } catch (loadError) {
+      setError(loadError.message || "Could not load inventory.");
+    }
+  };
+
+  useEffect(() => {
+    loadItems();
+  }, [shopCode]);
+
+  const lowStockCount = useMemo(() => items.filter((item) => item.stock <= item.reorderLevel).length, [items]);
 
   const suggestedSellingPrice = useMemo(() => {
     const cost = Number(form.costPrice);
@@ -103,36 +74,42 @@ function InventoryPage() {
     }
   };
 
-  const handleCreate = (event) => {
+  const handleCreate = async (event) => {
     event.preventDefault();
+    setError("");
+
     const hasRequired = form.sku && form.name && form.stock && form.reorderLevel;
     if (!hasRequired) return;
 
     const finalSellingPrice = autoPricing ? suggestedSellingPrice : form.sellingPrice;
     if (!finalSellingPrice) return;
 
-    const next = {
-      id: Date.now(),
-      sku: form.sku,
-      name: form.name,
-      costPrice: Number(form.costPrice || 0),
-      sellingPrice: Number(finalSellingPrice),
-      stock: Number(form.stock),
-      reorderLevel: Number(form.reorderLevel),
-      image: form.image || buildImage(form.name.slice(0, 12), "#e2e8f0"),
-    };
-    setItems((prev) => [next, ...prev]);
-    setForm({
-      sku: "",
-      name: "",
-      costPrice: "",
-      sellingPrice: "",
-      marginPercent: "25",
-      stock: "",
-      reorderLevel: "",
-      image: "",
-    });
-    setAutoPricing(false);
+    try {
+      await inventoryService.create({
+        sku: form.sku,
+        name: form.name,
+        costPrice: Number(form.costPrice || 0),
+        sellingPrice: Number(finalSellingPrice),
+        stock: Number(form.stock),
+        reorderLevel: Number(form.reorderLevel),
+        image: form.image || buildImage(form.name.slice(0, 12), "#e2e8f0"),
+      }, shopCode);
+
+      await loadItems();
+      setForm({
+        sku: "",
+        name: "",
+        costPrice: "",
+        sellingPrice: "",
+        marginPercent: "25",
+        stock: "",
+        reorderLevel: "",
+        image: "",
+      });
+      setAutoPricing(false);
+    } catch (createError) {
+      setError(createError.message || "Could not add product.");
+    }
   };
 
   const handleEdit = (item) => {
@@ -145,21 +122,78 @@ function InventoryPage() {
     });
   };
 
-  const handleSave = () => {
-    setItems((prev) =>
-      prev.map((item) =>
-        item.id === editingId
-          ? {
-              ...item,
-              name: draft.name,
-              costPrice: Number(draft.costPrice),
-              sellingPrice: Number(draft.sellingPrice),
-              stock: Number(draft.stock),
-            }
-          : item,
-      ),
-    );
-    setEditingId(null);
+  const handleSave = async () => {
+    if (!editingId) return;
+    setError("");
+
+    try {
+      await inventoryService.update(editingId, {
+        name: draft.name,
+        costPrice: Number(draft.costPrice),
+        sellingPrice: Number(draft.sellingPrice),
+        stock: Number(draft.stock),
+      });
+      await loadItems();
+      setEditingId(null);
+    } catch (saveError) {
+      setError(saveError.message || "Could not update product.");
+    }
+  };
+
+  const handleDelete = async (id) => {
+    setError("");
+    try {
+      await inventoryService.remove(id);
+      await loadItems();
+    } catch (deleteError) {
+      setError(deleteError.message || "Could not delete product.");
+    }
+  };
+
+  const handleExportStock = async () => {
+    setError("");
+    try {
+      const payload = await inventoryService.exportStockFile(shopCode);
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.setAttribute("download", `stock-${shopCode}.json`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (exportError) {
+      setError(exportError.message || "Could not export stock.");
+    }
+  };
+
+  const handleImportStock = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setError("");
+    try {
+      const text = await file.text();
+      const payload = JSON.parse(text);
+      await inventoryService.importStockFile({
+        shopCode,
+        mode: importMode,
+        items: Array.isArray(payload.items) ? payload.items : [],
+      });
+      await loadItems();
+    } catch (importError) {
+      setError(importError.message || "Could not import stock.");
+    } finally {
+      event.target.value = "";
+    }
+  };
+
+  const handleCreateBackup = async () => {
+    setError("");
+    try {
+      await inventoryService.createBackup();
+      window.alert("Backup snapshot created in data/backups.");
+    } catch (backupError) {
+      setError(backupError.message || "Could not create backup.");
+    }
   };
 
   return (
@@ -167,9 +201,34 @@ function InventoryPage() {
       <header className="rounded-md border border-slate-200 bg-white p-3">
         <h1 className="text-lg font-extrabold text-slate-900">Inventory</h1>
         <p className="text-sm text-slate-600">
-          SKU management with Android-friendly image capture, pricing fields, and low-stock alerts (
-          {lowStockCount} active).
+          Central stock storage enabled. Entries are shared across web and mobile via backend API ({lowStockCount} low stock).
         </p>
+        <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+          <input
+            value={shopCode}
+            onChange={(event) => setShopCode(event.target.value.trim() || "default")}
+            placeholder="Shop code (e.g. shop-a)"
+            className="rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+          />
+          <select
+            value={importMode}
+            onChange={(event) => setImportMode(event.target.value)}
+            className="rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+          >
+            <option value="merge">Import Mode: Merge</option>
+            <option value="replace">Import Mode: Replace</option>
+          </select>
+          <button onClick={handleExportStock} className="rounded-md border border-slate-300 px-3 py-1.5 text-sm font-semibold">
+            Export Stock File
+          </button>
+          <label className="cursor-pointer rounded-md border border-slate-300 px-3 py-1.5 text-sm font-semibold text-center">
+            Import Stock File
+            <input type="file" accept="application/json" onChange={handleImportStock} className="hidden" />
+          </label>
+          <button onClick={handleCreateBackup} className="rounded-md border border-emerald-300 px-3 py-1.5 text-sm font-semibold text-emerald-700">
+            Create DB Backup
+          </button>
+        </div>
       </header>
 
       <form
@@ -261,13 +320,14 @@ function InventoryPage() {
             />
           </label>
         </div>
-        {form.image ? (
-          <div className="xl:col-span-8">
-            <img src={form.image} alt="Preview" className="h-20 w-32 rounded border border-slate-300 object-cover" />
-          </div>
-        ) : null}
-        <button className="rounded-md bg-sky-800 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-sky-900 xl:col-span-8">
-          Add Item
+
+        {error ? <p className="text-xs font-semibold text-red-700 xl:col-span-8">{error}</p> : null}
+
+        <button
+          type="submit"
+          className="rounded-md bg-sky-700 px-3 py-2 text-sm font-semibold text-white hover:bg-sky-800 xl:col-span-8"
+        >
+          Add Product
         </button>
       </form>
 
@@ -279,7 +339,7 @@ function InventoryPage() {
         onDraft={(field, value) => setDraft((prev) => ({ ...prev, [field]: value }))}
         onSave={handleSave}
         onCancel={() => setEditingId(null)}
-        onDelete={(id) => setItems((prev) => prev.filter((item) => item.id !== id))}
+        onDelete={handleDelete}
       />
     </div>
   );

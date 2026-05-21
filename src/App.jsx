@@ -8,6 +8,7 @@ import DuesPage from "./components/DuesPage";
 import ExpensesPage from "./components/ExpensesPage";
 import OtherIncomePage from "./components/OtherIncomePage";
 import LedgerPage from "./components/LedgerPage";
+import ReportsPage from "./components/ReportsPage";
 
 function App() {
   return (
@@ -25,6 +26,7 @@ function App() {
             <Route path="/expenses" element={<ExpensesPage />} />
             <Route path="/other-income" element={<OtherIncomePage />} />
             <Route path="/ledger" element={<LedgerPage />} />
+            <Route path="/reports" element={<ReportsPage />} />
           </Routes>
         </main>
       </div>

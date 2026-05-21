@@ -1,9 +1,10 @@
 import { Minus, Plus, Trash2 } from "lucide-react";
 
-function CalculationCart({ cartItems, onQtyChange, onRemove, onCheckout, onPrint }) {
+function CalculationCart({ cartItems, billType, onQtyChange, onPriceChange, onRemove, onCheckout, onPrint }) {
   const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.qty, 0);
-  const tax = subtotal * 0.13;
-  const discount = subtotal > 150 ? subtotal * 0.04 : 0;
+  const taxRate = billType === "wholesale" ? 0.05 : 0.13;
+  const tax = subtotal * taxRate;
+  const discount = billType === "wholesale" ? (subtotal > 500 ? subtotal * 0.08 : 0) : subtotal > 150 ? subtotal * 0.04 : 0;
   const total = subtotal + tax - discount;
 
   return (
@@ -23,6 +24,17 @@ function CalculationCart({ cartItems, onQtyChange, onRemove, onCheckout, onPrint
                 <div>
                   <h3 className="text-sm font-semibold text-slate-900">{item.name}</h3>
                   <p className="text-xs text-slate-600">${item.price.toFixed(2)} each</p>
+                  <div className="mt-1 flex items-center gap-1">
+                    <label className="text-xs text-slate-500">Editable price</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={item.price}
+                      onChange={(event) => onPriceChange(item.id, event.target.value)}
+                      className="w-20 rounded border border-slate-300 px-1.5 py-0.5 text-xs"
+                    />
+                  </div>
                 </div>
                 <button
                   onClick={() => onRemove(item.id)}
@@ -62,7 +74,7 @@ function CalculationCart({ cartItems, onQtyChange, onRemove, onCheckout, onPrint
           <span>${subtotal.toFixed(2)}</span>
         </div>
         <div className="flex justify-between text-slate-700">
-          <span>Tax (13%)</span>
+          <span>Tax ({Math.round(taxRate * 100)}%)</span>
           <span>${tax.toFixed(2)}</span>
         </div>
         <div className="flex justify-between text-slate-700">

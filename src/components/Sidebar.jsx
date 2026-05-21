@@ -9,6 +9,7 @@ import {
   Handshake,
   BanknoteArrowUp,
   ScrollText,
+  ChartColumnIncreasing,
 } from "lucide-react";
 import { NavLink } from "react-router-dom";
 
@@ -20,6 +21,7 @@ const navItems = [
   { name: "Expenses", to: "/expenses", icon: Handshake },
   { name: "Other Income", to: "/other-income", icon: BanknoteArrowUp },
   { name: "Ledger", to: "/ledger", icon: ScrollText },
+  { name: "Reports", to: "/reports", icon: ChartColumnIncreasing },
   { name: "Finance", to: "/finance", icon: Wallet },
 ];
 

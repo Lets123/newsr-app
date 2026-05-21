@@ -1,6 +1,21 @@
 ss -tlnp | grep 5173 || sudo ss -tlnp | grep 5173
 # or
-sudo lsof -iTCP -sTCP:LISTEN -P -n | grep 5173# Inventory Mobile (React Native)
+sudo lsof -iTCP -sTCP:LISTEN -P -n | grep 5173# from /home/yuuta/Downloads/newsr-app
+chmod +x scripts/run-dev.sh scripts/run-localtunnel.sh || true
+PORT=5173 nohup npm run dev -- --host 0.0.0.0 --port $PORT > vite.log 2>&1 &
+sleep 2
+# run localtunnel in foreground so you see the public URL
+npx --yes localtunnel --port $PORT# from /home/yuuta/Downloads/newsr-app
+chmod +x scripts/run-dev.sh scripts/run-localtunnel.sh || true
+PORT=5173 nohup npm run dev -- --host 0.0.0.0 --port $PORT > vite.log 2>&1 &
+sleep 2
+# run localtunnel in foreground so you see the public URL
+npx --yes localtunnel --port $PORT# from /home/yuuta/Downloads/newsr-app
+chmod +x scripts/run-dev.sh scripts/run-localtunnel.sh || true
+PORT=5173 nohup npm run dev -- --host 0.0.0.0 --port $PORT > vite.log 2>&1 &
+sleep 2
+# run localtunnel in foreground so you see the public URL
+npx --yes localtunnel --port $PORT# Inventory Mobile (React Native)
 
 This folder contains an early JS-only shell for the inventory app UI.
 

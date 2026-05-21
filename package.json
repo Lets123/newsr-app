@@ -6,14 +6,20 @@
   "scripts": {
     "dev": "vite",
     "dev:network": "vite --host",
+    "api": "node server/index.js",
+    "dev:all": "sh -c 'node server/index.js & vite --host'",
     "build": "vite build",
     "preview": "vite preview"
   },
   "dependencies": {
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
     "lucide-react": "^0.511.0",
+    "pg": "^8.21.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-router-dom": "^6.28.0"
+    "react-router-dom": "^6.28.0",
+    "sqlite3": "^6.0.1"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.4",

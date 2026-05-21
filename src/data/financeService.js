@@ -6,7 +6,10 @@ import {
   getLedgerEntries,
   getOtherIncome,
   getPayments,
+  importFinanceState,
   recordCollection,
+  exportFinanceState,
+  resetFinanceState,
 } from "./financeStore";
 import {
   FINANCE_ENDPOINTS,
@@ -50,6 +53,15 @@ const localFinanceService = {
   },
   async addOtherIncome(input) {
     return addOtherIncome(input);
+  },
+  async exportBackup() {
+    return { ok: true, data: exportFinanceState() };
+  },
+  async importBackup(input) {
+    return importFinanceState(input);
+  },
+  async resetData() {
+    return resetFinanceState();
   },
 };
 
@@ -104,6 +116,15 @@ const apiFinanceService = {
       }),
     );
     return { ok: true, income: created };
+  },
+  async exportBackup() {
+    return { ok: false, error: "Backup export is only available in local mode." };
+  },
+  async importBackup() {
+    return { ok: false, error: "Backup import is only available in local mode." };
+  },
+  async resetData() {
+    return { ok: false, error: "Data reset is only available in local mode." };
   },
 };
 

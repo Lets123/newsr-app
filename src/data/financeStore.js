@@ -101,10 +101,12 @@ const parseState = (raw) => {
   }
 };
 
+const cloneDefaultState = () => JSON.parse(JSON.stringify(defaultState));
+
 export function loadFinanceState() {
   const raw = window.localStorage.getItem(STORAGE_KEY);
-  if (!raw) return defaultState;
-  return parseState(raw) ?? defaultState;
+  if (!raw) return cloneDefaultState();
+  return parseState(raw) ?? cloneDefaultState();
 }
 
 export function saveFinanceState(nextState) {
@@ -240,4 +242,30 @@ export function getLedgerEntries() {
     if (a.date === b.date) return a.id < b.id ? 1 : -1;
     return a.date < b.date ? 1 : -1;
   });
+}
+
+export function exportFinanceState() {
+  return loadFinanceState();
+}
+
+export function importFinanceState(nextState) {
+  if (!nextState || typeof nextState !== "object") {
+    return { ok: false, error: "Invalid backup file format." };
+  }
+
+  const parsed = {
+    invoices: Array.isArray(nextState.invoices) ? nextState.invoices : [],
+    payments: Array.isArray(nextState.payments) ? nextState.payments : [],
+    expenses: Array.isArray(nextState.expenses) ? nextState.expenses : [],
+    otherIncome: Array.isArray(nextState.otherIncome) ? nextState.otherIncome : [],
+  };
+
+  saveFinanceState(parsed);
+  return { ok: true };
+}
+
+export function resetFinanceState() {
+  const nextState = cloneDefaultState();
+  saveFinanceState(nextState);
+  return { ok: true };
 }

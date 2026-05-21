@@ -1,5 +1,6 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
+  ActivityIndicator,
   Button,
   FlatList,
   Image,
@@ -12,9 +13,17 @@ import {
 } from "react-native";
 import { launchCamera, launchImageLibrary } from "react-native-image-picker";
 
+const API_BASE_URL = "http://10.0.2.2:4000";
+
+async function parseJsonResponse(response) {
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload?.error || `Request failed: ${response.status}`);
+  return payload;
+}
+
 function InventoryScreen() {
   const [products, setProducts] = useState([]);
-  const [imageUri, setImageUri] = useState(null);
+  const [imageDataUrl, setImageDataUrl] = useState(null);
   const [sku, setSku] = useState("");
   const [name, setName] = useState("");
   const [costPrice, setCostPrice] = useState("");
@@ -22,6 +31,25 @@ function InventoryScreen() {
   const [markupPercentage, setMarkupPercentage] = useState("25");
   const [stock, setStock] = useState("");
   const [autoCalculate, setAutoCalculate] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const loadInventory = async () => {
+    try {
+      setLoading(true);
+      const data = await parseJsonResponse(await fetch(`${API_BASE_URL}/api/v1/inventory`));
+      setProducts(data || []);
+      setError("");
+    } catch (loadError) {
+      setError(loadError.message || "Could not load inventory.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadInventory();
+  }, []);
 
   const calculatedSellingPrice = useMemo(() => {
     const cost = Number(costPrice);
@@ -33,19 +61,28 @@ function InventoryScreen() {
   }, [costPrice, markupPercentage]);
 
   const handleImageSelect = async () => {
-    const result = await launchImageLibrary({ mediaType: "photo", selectionLimit: 1 });
+    const result = await launchImageLibrary({ mediaType: "photo", selectionLimit: 1, includeBase64: true });
     if (result.didCancel || result.errorCode || !result.assets?.length) return;
-    setImageUri(result.assets[0].uri);
+    const asset = result.assets[0];
+    if (!asset.base64) return;
+    setImageDataUrl(`data:${asset.type || "image/jpeg"};base64,${asset.base64}`);
   };
 
   const handleImageCapture = async () => {
-    const result = await launchCamera({ mediaType: "photo", cameraType: "back", saveToPhotos: true });
+    const result = await launchCamera({
+      mediaType: "photo",
+      cameraType: "back",
+      saveToPhotos: true,
+      includeBase64: true,
+    });
     if (result.didCancel || result.errorCode || !result.assets?.length) return;
-    setImageUri(result.assets[0].uri);
+    const asset = result.assets[0];
+    if (!asset.base64) return;
+    setImageDataUrl(`data:${asset.type || "image/jpeg"};base64,${asset.base64}`);
   };
 
   const resetForm = () => {
-    setImageUri(null);
+    setImageDataUrl(null);
     setSku("");
     setName("");
     setCostPrice("");
@@ -55,23 +92,36 @@ function InventoryScreen() {
     setAutoCalculate(false);
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     const finalPrice = autoCalculate ? calculatedSellingPrice : sellingPrice;
     if (!sku || !name || !finalPrice) return;
 
-    const next = {
-      id: Date.now().toString(),
-      sku,
-      name,
-      image: imageUri,
-      costPrice: Number(costPrice || 0),
-      sellingPrice: Number(finalPrice || 0),
-      markupPercentage: Number(markupPercentage || 0),
-      stock: Number(stock || 0),
-    };
+    try {
+      setLoading(true);
+      await parseJsonResponse(
+        await fetch(`${API_BASE_URL}/api/v1/inventory`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            sku,
+            name,
+            image: imageDataUrl || "",
+            costPrice: Number(costPrice || 0),
+            sellingPrice: Number(finalPrice || 0),
+            stock: Number(stock || 0),
+            reorderLevel: 0,
+          }),
+        }),
+      );
 
-    setProducts((prev) => [next, ...prev]);
-    resetForm();
+      await loadInventory();
+      resetForm();
+      setError("");
+    } catch (submitError) {
+      setError(submitError.message || "Could not save product.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const renderItem = ({ item }) => {
@@ -89,8 +139,8 @@ function InventoryScreen() {
         <View style={styles.rowContent}>
           <Text style={styles.rowTitle}>{item.name}</Text>
           <Text style={styles.rowText}>SKU: {item.sku}</Text>
-          <Text style={styles.rowText}>Cost: ${item.costPrice.toFixed(2)}</Text>
-          <Text style={styles.rowText}>Selling: ${item.sellingPrice.toFixed(2)}</Text>
+          <Text style={styles.rowText}>Cost: ${Number(item.costPrice || 0).toFixed(2)}</Text>
+          <Text style={styles.rowText}>Selling: ${Number(item.sellingPrice || 0).toFixed(2)}</Text>
           <Text style={styles.rowText}>Margin: {margin}%</Text>
           <Text style={styles.rowText}>Stock: {item.stock}</Text>
         </View>
@@ -101,6 +151,7 @@ function InventoryScreen() {
   return (
     <View style={styles.container}>
       <Text style={styles.heading}>Inventory (Android)</Text>
+      {!!error ? <Text style={styles.error}>{error}</Text> : null}
 
       <View style={styles.buttons}>
         <Button title="Select Image" onPress={handleImageSelect} />
@@ -108,7 +159,7 @@ function InventoryScreen() {
         <Button title="Capture Image" onPress={handleImageCapture} />
       </View>
 
-      {imageUri ? <Image source={{ uri: imageUri }} style={styles.preview} /> : null}
+      {imageDataUrl ? <Image source={{ uri: imageDataUrl }} style={styles.preview} /> : null}
 
       <TextInput value={sku} onChangeText={setSku} placeholder="SKU" style={styles.input} />
       <TextInput value={name} onChangeText={setName} placeholder="Product Name" style={styles.input} />
@@ -148,14 +199,16 @@ function InventoryScreen() {
         style={styles.input}
       />
 
-      <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
-        <Text style={styles.submitLabel}>Add Product</Text>
+      <TouchableOpacity style={styles.submitButton} onPress={handleSubmit} disabled={loading}>
+        <Text style={styles.submitLabel}>{loading ? "Saving..." : "Add Product"}</Text>
       </TouchableOpacity>
+
+      {loading ? <ActivityIndicator color="#0f766e" style={{ marginTop: 8 }} /> : null}
 
       <FlatList
         data={products}
         renderItem={renderItem}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item) => String(item.id)}
         contentContainerStyle={styles.list}
         ListEmptyComponent={<Text style={styles.empty}>No products yet.</Text>}
       />
@@ -173,6 +226,11 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: "700",
     color: "#0f172a",
+    marginBottom: 8,
+  },
+  error: {
+    color: "#b91c1c",
+    fontWeight: "600",
     marginBottom: 8,
   },
   buttons: {
