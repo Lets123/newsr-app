@@ -27,6 +27,7 @@ function InventoryPage() {
   const [form, setForm] = useState({
     sku: "",
     name: "",
+    category: "",
     costPrice: "",
     sellingPrice: "",
     marginPercent: "25",
@@ -37,9 +38,11 @@ function InventoryPage() {
   const [error, setError] = useState("");
   const [shopCode, setShopCode] = useState("default");
   const [importMode, setImportMode] = useState("merge");
+  const [categoryDraft, setCategoryDraft] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
   const [autoPricing, setAutoPricing] = useState(false);
   const [editingId, setEditingId] = useState(null);
-  const [draft, setDraft] = useState({ name: "", costPrice: "", sellingPrice: "", stock: "" });
+  const [draft, setDraft] = useState({ name: "", category: "", costPrice: "", sellingPrice: "", stock: "" });
 
   const loadItems = async () => {
     try {
@@ -55,6 +58,19 @@ function InventoryPage() {
   }, [shopCode]);
 
   const lowStockCount = useMemo(() => items.filter((item) => item.stock <= item.reorderLevel).length, [items]);
+
+  const categories = useMemo(
+    () => [...new Set(items.map((item) => item.category).filter(Boolean))].sort((a, b) => a.localeCompare(b)),
+    [items],
+  );
+
+  const visibleItems = useMemo(() => {
+    const value = searchTerm.trim().toLowerCase();
+    if (!value) return items;
+    return items.filter((item) =>
+      [item.name, item.sku, item.category].some((field) => String(field || "").toLowerCase().includes(value)),
+    );
+  }, [items, searchTerm]);
 
   const suggestedSellingPrice = useMemo(() => {
     const cost = Number(form.costPrice);
@@ -88,6 +104,7 @@ function InventoryPage() {
       await inventoryService.create({
         sku: form.sku,
         name: form.name,
+        category: form.category,
         costPrice: Number(form.costPrice || 0),
         sellingPrice: Number(finalSellingPrice),
         stock: Number(form.stock),
@@ -99,6 +116,7 @@ function InventoryPage() {
       setForm({
         sku: "",
         name: "",
+        category: "",
         costPrice: "",
         sellingPrice: "",
         marginPercent: "25",
@@ -116,6 +134,7 @@ function InventoryPage() {
     setEditingId(item.id);
     setDraft({
       name: item.name,
+      category: item.category || "",
       costPrice: String(item.costPrice ?? 0),
       sellingPrice: String(item.sellingPrice),
       stock: String(item.stock),
@@ -129,6 +148,7 @@ function InventoryPage() {
     try {
       await inventoryService.update(editingId, {
         name: draft.name,
+        category: draft.category,
         costPrice: Number(draft.costPrice),
         sellingPrice: Number(draft.sellingPrice),
         stock: Number(draft.stock),
@@ -138,6 +158,14 @@ function InventoryPage() {
     } catch (saveError) {
       setError(saveError.message || "Could not update product.");
     }
+  };
+
+  const handleCreateCategory = () => {
+    const nextCategory = categoryDraft.trim();
+    if (!nextCategory) return;
+    setForm((prev) => ({ ...prev, category: nextCategory }));
+    setSearchTerm(nextCategory);
+    setCategoryDraft("");
   };
 
   const handleDelete = async (id) => {
@@ -229,6 +257,27 @@ function InventoryPage() {
             Create DB Backup
           </button>
         </div>
+        <div className="mt-2 grid gap-2 sm:grid-cols-3">
+          <input
+            value={searchTerm}
+            onChange={(event) => setSearchTerm(event.target.value)}
+            placeholder="Search product, SKU, category..."
+            className="rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+          />
+          <input
+            value={categoryDraft}
+            onChange={(event) => setCategoryDraft(event.target.value)}
+            placeholder="Create category (e.g. Jeans)"
+            className="rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+          />
+          <button
+            type="button"
+            onClick={handleCreateCategory}
+            className="rounded-md border border-sky-300 px-3 py-1.5 text-sm font-semibold text-sky-700"
+          >
+            Add Category
+          </button>
+        </div>
       </header>
 
       <form
@@ -249,6 +298,18 @@ function InventoryPage() {
           onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
           className="rounded-md border border-slate-300 px-2 py-1.5"
         />
+        <input
+          list="inventory-categories"
+          placeholder="Category"
+          value={form.category}
+          onChange={(event) => setForm((prev) => ({ ...prev, category: event.target.value }))}
+          className="rounded-md border border-slate-300 px-2 py-1.5"
+        />
+        <datalist id="inventory-categories">
+          {categories.map((category) => (
+            <option key={category} value={category} />
+          ))}
+        </datalist>
         <input
           type="number"
           step="0.01"
@@ -332,7 +393,7 @@ function InventoryPage() {
       </form>
 
       <InventoryTable
-        items={items}
+        items={visibleItems}
         editingId={editingId}
         draft={draft}
         onEdit={handleEdit}

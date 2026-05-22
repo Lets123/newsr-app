@@ -13,10 +13,10 @@ const buildImage = (label, bg) => {
 };
 
 const defaultInventory = [
-  { id: 1, sku: "RFL-101", name: "Basmati Rice 5kg", costPrice: 14.2, sellingPrice: 18.5, stock: 24, reorderLevel: 15, image: buildImage("Rice", "#fde68a") },
-  { id: 2, sku: "RFL-102", name: "Sunflower Oil 1L", costPrice: 4.25, sellingPrice: 5.75, stock: 72, reorderLevel: 20, image: buildImage("Oil", "#fef3c7") },
-  { id: 3, sku: "RFL-103", name: "Whole Wheat Flour 2kg", costPrice: 3.5, sellingPrice: 4.9, stock: 9, reorderLevel: 12, image: buildImage("Flour", "#f5deb8") },
-  { id: 4, sku: "RFL-104", name: "Black Tea 500g", costPrice: 4.7, sellingPrice: 6.4, stock: 11, reorderLevel: 10, image: buildImage("Tea", "#fecaca") },
+  { id: 1, sku: "RFL-101", name: "Basmati Rice 5kg", category: "Groceries", costPrice: 14.2, sellingPrice: 18.5, stock: 24, reorderLevel: 15, image: buildImage("Rice", "#fde68a") },
+  { id: 2, sku: "RFL-102", name: "Sunflower Oil 1L", category: "Groceries", costPrice: 4.25, sellingPrice: 5.75, stock: 72, reorderLevel: 20, image: buildImage("Oil", "#fef3c7") },
+  { id: 3, sku: "RFL-103", name: "Whole Wheat Flour 2kg", category: "Groceries", costPrice: 3.5, sellingPrice: 4.9, stock: 9, reorderLevel: 12, image: buildImage("Flour", "#f5deb8") },
+  { id: 4, sku: "RFL-104", name: "Black Tea 500g", category: "Groceries", costPrice: 4.7, sellingPrice: 6.4, stock: 11, reorderLevel: 10, image: buildImage("Tea", "#fecaca") },
 ];
 
 async function parseJsonResponse(response) {
@@ -35,6 +35,7 @@ const normalizeItem = (item) => ({
   id: item.id,
   sku: item.sku,
   name: item.name,
+  category: item.category || "",
   costPrice: Number(item.costPrice ?? item.costprice ?? 0),
   sellingPrice: Number(item.sellingPrice ?? item.sellingprice ?? 0),
   stock: Number(item.stock ?? 0),

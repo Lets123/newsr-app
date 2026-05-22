@@ -17,6 +17,7 @@ function InventoryTable({
           <tr>
             <th className="px-3 py-2">Image</th>
             <th className="px-3 py-2">SKU</th>
+            <th className="px-3 py-2">Category</th>
             <th className="px-3 py-2">Item</th>
             <th className="px-3 py-2">Cost</th>
             <th className="px-3 py-2">Selling</th>
@@ -41,6 +42,17 @@ function InventoryTable({
                   />
                 </td>
                 <td className="px-3 py-2 font-semibold text-slate-800">{item.sku}</td>
+                <td className="px-3 py-2">
+                  {isEditing ? (
+                    <input
+                      value={draft.category}
+                      onChange={(event) => onDraft("category", event.target.value)}
+                      className="w-36 rounded border border-slate-300 px-2 py-1"
+                    />
+                  ) : (
+                    item.category || "-"
+                  )}
+                </td>
                 <td className="px-3 py-2">
                   {isEditing ? (
                     <input

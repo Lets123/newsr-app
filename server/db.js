@@ -17,10 +17,10 @@ if (!fs.existsSync(backupDir)) fs.mkdirSync(backupDir, { recursive: true });
 const nowIso = () => new Date().toISOString();
 
 const seedRows = [
-  ["RFL-101", "Basmati Rice 5kg", 14.2, 18.5, 24, 15, "", "default"],
-  ["RFL-102", "Sunflower Oil 1L", 4.25, 5.75, 72, 20, "", "default"],
-  ["RFL-103", "Whole Wheat Flour 2kg", 3.5, 4.9, 9, 12, "", "default"],
-  ["RFL-104", "Black Tea 500g", 4.7, 6.4, 11, 10, "", "default"],
+  ["RFL-101", "Basmati Rice 5kg", "Groceries", 14.2, 18.5, 24, 15, "", "default"],
+  ["RFL-102", "Sunflower Oil 1L", "Groceries", 4.25, 5.75, 72, 20, "", "default"],
+  ["RFL-103", "Whole Wheat Flour 2kg", "Groceries", 3.5, 4.9, 9, 12, "", "default"],
+  ["RFL-104", "Black Tea 500g", "Groceries", 4.7, 6.4, 11, 10, "", "default"],
 ];
 
 let db = null;
@@ -79,6 +79,7 @@ async function initPostgres() {
       id BIGSERIAL PRIMARY KEY,
       sku TEXT NOT NULL,
       name TEXT NOT NULL,
+      category TEXT NOT NULL DEFAULT '',
       cost_price DOUBLE PRECISION NOT NULL DEFAULT 0,
       selling_price DOUBLE PRECISION NOT NULL DEFAULT 0,
       stock INTEGER NOT NULL DEFAULT 0,
@@ -93,14 +94,21 @@ async function initPostgres() {
 
   await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_inventory_shop_sku ON inventory_items(shop_code, sku)`);
 
+  const pgColumns = await pool.query(
+    `SELECT column_name FROM information_schema.columns WHERE table_name = 'inventory_items'`,
+  );
+  if (!pgColumns.rows.some((col) => col.column_name === "category")) {
+    await pool.query(`ALTER TABLE inventory_items ADD COLUMN category TEXT NOT NULL DEFAULT ''`);
+  }
+
   const existing = await pool.query("SELECT id FROM inventory_items WHERE is_deleted = 0 LIMIT 1");
   if (existing.rows.length === 0) {
     const now = nowIso();
     for (const row of seedRows) {
       await pool.query(
         `INSERT INTO inventory_items
-         (sku, name, cost_price, selling_price, stock, reorder_level, image, shop_code, created_at, updated_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+         (sku, name, category, cost_price, selling_price, stock, reorder_level, image, shop_code, created_at, updated_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
         [...row, now, now],
       );
     }
@@ -118,6 +126,7 @@ async function initSqlite() {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       sku TEXT NOT NULL,
       name TEXT NOT NULL,
+      category TEXT NOT NULL DEFAULT '',
       cost_price REAL NOT NULL DEFAULT 0,
       selling_price REAL NOT NULL DEFAULT 0,
       stock INTEGER NOT NULL DEFAULT 0,
@@ -133,6 +142,9 @@ async function initSqlite() {
   if (!cols.some((col) => col.name === "shop_code")) {
     await run(`ALTER TABLE inventory_items ADD COLUMN shop_code TEXT NOT NULL DEFAULT 'default'`);
   }
+  if (!cols.some((col) => col.name === "category")) {
+    await run(`ALTER TABLE inventory_items ADD COLUMN category TEXT NOT NULL DEFAULT ''`);
+  }
   await run(`CREATE UNIQUE INDEX IF NOT EXISTS idx_inventory_shop_sku ON inventory_items(shop_code, sku)`);
 
   const existing = await all("SELECT id FROM inventory_items WHERE is_deleted = 0 LIMIT 1");
@@ -141,8 +153,8 @@ async function initSqlite() {
     for (const row of seedRows) {
       await run(
         `INSERT INTO inventory_items
-         (sku, name, cost_price, selling_price, stock, reorder_level, image, shop_code, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         (sku, name, category, cost_price, selling_price, stock, reorder_level, image, shop_code, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [...row, now, now],
       );
     }
@@ -162,7 +174,7 @@ async function snapshotDb(reason = "manual") {
     const stamp = new Date().toISOString().replaceAll(":", "-");
     const filePath = path.join(backupDir, `retailflow-${reason}-${stamp}.json`);
     const rows = await all(
-      `SELECT sku, name, cost_price AS "costPrice", selling_price AS "sellingPrice", stock,
+      `SELECT sku, name, category, cost_price AS "costPrice", selling_price AS "sellingPrice", stock,
               reorder_level AS "reorderLevel", shop_code AS "shopCode", image
        FROM inventory_items WHERE is_deleted = 0 ORDER BY id DESC`,
     );
