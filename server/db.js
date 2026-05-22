@@ -62,8 +62,12 @@ async function all(sql, params = []) {
 }
 
 async function initPostgres() {
+  const parsed = new URL(DATABASE_URL);
+  parsed.searchParams.set("sslmode", "require");
+  parsed.searchParams.set("uselibpqcompat", "true");
+
   pool = new Pool({
-    connectionString: DATABASE_URL,
+    connectionString: parsed.toString(),
     ssl: { rejectUnauthorized: false },
   });
 
