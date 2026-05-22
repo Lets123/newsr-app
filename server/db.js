@@ -68,7 +68,10 @@ async function initPostgres() {
 
   pool = new Pool({
     connectionString: parsed.toString(),
-    ssl: { rejectUnauthorized: false },
+    ssl: {
+      require: true,
+      rejectUnauthorized: false,
+    },
   });
 
   await pool.query(`
