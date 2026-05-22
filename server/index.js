@@ -32,6 +32,39 @@ app.get("/api/v1/inventory", async (_req, res) => {
   }
 });
 
+app.get("/api/v1/categories", async (req, res) => {
+  try {
+    const shopCode = String(req.query.shopCode || "default").trim() || "default";
+    const rows = await all(
+      `SELECT name FROM inventory_categories WHERE shop_code = ? ORDER BY name ASC`,
+      [shopCode],
+    );
+    res.json(rows.map((row) => row.name));
+  } catch (error) {
+    res.status(500).json({ error: error.message || "Could not load categories." });
+  }
+});
+
+app.post("/api/v1/categories", async (req, res) => {
+  try {
+    const { shopCode, name } = req.body || {};
+    const shop = String(shopCode || "default").trim() || "default";
+    const category = String(name || "").trim();
+    if (!category) return res.status(400).json({ error: "Category name is required." });
+
+    await run(
+      `INSERT INTO inventory_categories (shop_code, name, created_at) VALUES (?, ?, ?)`,
+      [shop, category, nowIso()],
+    ).catch((error) => {
+      if (!String(error.message || "").includes("UNIQUE")) throw error;
+    });
+    await snapshotDb("category");
+    res.status(201).json({ name: category });
+  } catch (error) {
+    res.status(500).json({ error: error.message || "Could not create category." });
+  }
+});
+
 app.post("/api/v1/inventory", async (req, res) => {
   try {
     const { sku, name, category, costPrice, sellingPrice, stock, reorderLevel, image, shopCode } = req.body || {};
@@ -39,6 +72,15 @@ app.post("/api/v1/inventory", async (req, res) => {
 
     const now = nowIso();
     const shop = String(shopCode || "default").trim() || "default";
+    const categoryName = String(category || "").trim();
+    if (categoryName) {
+      await run(
+        `INSERT INTO inventory_categories (shop_code, name, created_at) VALUES (?, ?, ?)`,
+        [shop, categoryName, now],
+      ).catch((error) => {
+        if (!String(error.message || "").includes("UNIQUE")) throw error;
+      });
+    }
     const result = await run(
       `INSERT INTO inventory_items
        (sku, name, category, cost_price, selling_price, stock, reorder_level, image, shop_code, created_at, updated_at)
@@ -46,7 +88,7 @@ app.post("/api/v1/inventory", async (req, res) => {
       [
         String(sku).trim(),
         String(name).trim(),
-        String(category || "").trim(),
+        categoryName,
         Number(costPrice || 0),
         Number(sellingPrice || 0),
         Number(stock || 0),

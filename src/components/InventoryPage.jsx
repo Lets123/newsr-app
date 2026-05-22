@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import InventoryTable from "./InventoryTable";
-import { inventoryService } from "../data/inventoryService";
+import { getActiveShop, inventoryService } from "../data/inventoryService";
 
 const buildImage = (label, bg) => {
   const svg = `
@@ -36,10 +36,8 @@ function InventoryPage() {
     image: "",
   });
   const [error, setError] = useState("");
-  const [shopCode, setShopCode] = useState("default");
-  const [importMode, setImportMode] = useState("merge");
-  const [categoryDraft, setCategoryDraft] = useState("");
-  const [customCategories, setCustomCategories] = useState([]);
+  const [shopCode] = useState(() => getActiveShop());
+  const [categories, setCategories] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [autoPricing, setAutoPricing] = useState(false);
   const [editingId, setEditingId] = useState(null);
@@ -54,19 +52,21 @@ function InventoryPage() {
     }
   };
 
+  const loadCategories = async () => {
+    try {
+      const loaded = await inventoryService.listCategories(shopCode);
+      setCategories(loaded || []);
+    } catch {
+      setCategories([]);
+    }
+  };
+
   useEffect(() => {
     loadItems();
+    loadCategories();
   }, [shopCode]);
 
   const lowStockCount = useMemo(() => items.filter((item) => item.stock <= item.reorderLevel).length, [items]);
-
-  const categories = useMemo(
-    () =>
-      [...new Set([...items.map((item) => item.category), ...customCategories].filter(Boolean))].sort((a, b) =>
-        a.localeCompare(b),
-      ),
-    [customCategories, items],
-  );
 
   const visibleItems = useMemo(() => {
     const value = searchTerm.trim().toLowerCase();
@@ -117,6 +117,7 @@ function InventoryPage() {
       }, shopCode);
 
       await loadItems();
+      await loadCategories();
       setForm({
         sku: "",
         name: "",
@@ -164,14 +165,6 @@ function InventoryPage() {
     }
   };
 
-  const handleCreateCategory = () => {
-    const nextCategory = categoryDraft.trim();
-    if (!nextCategory) return;
-    setCustomCategories((prev) => (prev.includes(nextCategory) ? prev : [...prev, nextCategory]));
-    setForm((prev) => ({ ...prev, category: nextCategory }));
-    setCategoryDraft("");
-  };
-
   const handleDelete = async (id) => {
     setError("");
     try {
@@ -182,105 +175,20 @@ function InventoryPage() {
     }
   };
 
-  const handleExportStock = async () => {
-    setError("");
-    try {
-      const payload = await inventoryService.exportStockFile(shopCode);
-      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
-      const link = document.createElement("a");
-      link.href = URL.createObjectURL(blob);
-      link.setAttribute("download", `stock-${shopCode}.json`);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-    } catch (exportError) {
-      setError(exportError.message || "Could not export stock.");
-    }
-  };
-
-  const handleImportStock = async (event) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    setError("");
-    try {
-      const text = await file.text();
-      const payload = JSON.parse(text);
-      await inventoryService.importStockFile({
-        shopCode,
-        mode: importMode,
-        items: Array.isArray(payload.items) ? payload.items : [],
-      });
-      await loadItems();
-    } catch (importError) {
-      setError(importError.message || "Could not import stock.");
-    } finally {
-      event.target.value = "";
-    }
-  };
-
-  const handleCreateBackup = async () => {
-    setError("");
-    try {
-      await inventoryService.createBackup();
-      window.alert("Backup snapshot created in data/backups.");
-    } catch (backupError) {
-      setError(backupError.message || "Could not create backup.");
-    }
-  };
-
   return (
     <div className="space-y-3">
       <header className="rounded-md border border-slate-200 bg-white p-3">
         <h1 className="text-lg font-extrabold text-slate-900">Inventory</h1>
         <p className="text-sm text-slate-600">
-          Central stock storage enabled. Entries are shared across web and mobile via backend API ({lowStockCount} low stock).
+          Active shop: <span className="font-semibold">{shopCode}</span> | {lowStockCount} low stock.
         </p>
-        <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
-          <input
-            value={shopCode}
-            onChange={(event) => setShopCode(event.target.value.trim() || "default")}
-            placeholder="Shop code (e.g. shop-a)"
-            className="rounded-md border border-slate-300 px-2 py-1.5 text-sm"
-          />
-          <select
-            value={importMode}
-            onChange={(event) => setImportMode(event.target.value)}
-            className="rounded-md border border-slate-300 px-2 py-1.5 text-sm"
-          >
-            <option value="merge">Import Mode: Merge</option>
-            <option value="replace">Import Mode: Replace</option>
-          </select>
-          <button onClick={handleExportStock} className="rounded-md border border-slate-300 px-3 py-1.5 text-sm font-semibold">
-            Export Stock File
-          </button>
-          <label className="cursor-pointer rounded-md border border-slate-300 px-3 py-1.5 text-sm font-semibold text-center">
-            Import Stock File
-            <input type="file" accept="application/json" onChange={handleImportStock} className="hidden" />
-          </label>
-          <button onClick={handleCreateBackup} className="rounded-md border border-emerald-300 px-3 py-1.5 text-sm font-semibold text-emerald-700">
-            Create DB Backup
-          </button>
-        </div>
-        <div className="mt-2 grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
+        <div className="mt-2">
           <input
             value={searchTerm}
             onChange={(event) => setSearchTerm(event.target.value)}
             placeholder="Search product, SKU, category..."
-            className="rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
           />
-          <input
-            value={categoryDraft}
-            onChange={(event) => setCategoryDraft(event.target.value)}
-            placeholder="Create category (e.g. Jeans)"
-            className="rounded-md border border-slate-300 px-2 py-1.5 text-sm"
-          />
-          <button
-            type="button"
-            onClick={handleCreateCategory}
-            className="rounded-md border border-sky-300 px-4 py-2 text-sm font-semibold text-sky-700"
-          >
-            Add Category
-          </button>
         </div>
       </header>
 

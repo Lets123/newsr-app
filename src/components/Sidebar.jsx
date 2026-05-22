@@ -10,6 +10,7 @@ import {
   BanknoteArrowUp,
   ScrollText,
   ChartColumnIncreasing,
+  Settings2,
 } from "lucide-react";
 import { NavLink } from "react-router-dom";
 
@@ -17,6 +18,7 @@ const navItems = [
   { name: "Dashboard", to: "/dashboard", icon: LayoutDashboard },
   { name: "Billing", to: "/billing", icon: ReceiptText },
   { name: "Inventory", to: "/inventory", icon: Boxes },
+  { name: "Stock Setup", to: "/stock-setup", icon: Settings2 },
   { name: "Dues", to: "/dues", icon: HandCoins },
   { name: "Expenses", to: "/expenses", icon: Handshake },
   { name: "Other Income", to: "/other-income", icon: BanknoteArrowUp },

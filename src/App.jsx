@@ -9,6 +9,7 @@ import ExpensesPage from "./components/ExpensesPage";
 import OtherIncomePage from "./components/OtherIncomePage";
 import LedgerPage from "./components/LedgerPage";
 import ReportsPage from "./components/ReportsPage";
+import StockSetupPage from "./components/StockSetupPage";
 
 function App() {
   return (
@@ -21,6 +22,7 @@ function App() {
             <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/billing" element={<BillingPage />} />
             <Route path="/inventory" element={<InventoryPage />} />
+            <Route path="/stock-setup" element={<StockSetupPage />} />
             <Route path="/finance" element={<FinancePage />} />
             <Route path="/dues" element={<DuesPage />} />
             <Route path="/expenses" element={<ExpensesPage />} />

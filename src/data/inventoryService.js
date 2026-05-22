@@ -1,4 +1,6 @@
 const INVENTORY_STORAGE_KEY = "retailflow-inventory-v1";
+const ACTIVE_SHOP_KEY = "retailflow-active-shop";
+const CATEGORY_STORAGE_KEY = "retailflow-categories-v1";
 
 const buildImage = (label, bg) => {
   const svg = `
@@ -58,9 +60,48 @@ function saveLocal(next) {
   window.localStorage.setItem(INVENTORY_STORAGE_KEY, JSON.stringify(next));
 }
 
+function readLocalCategories(shopCode = "default") {
+  const raw = window.localStorage.getItem(CATEGORY_STORAGE_KEY);
+  try {
+    const parsed = raw ? JSON.parse(raw) : {};
+    return Array.isArray(parsed[shopCode]) ? parsed[shopCode] : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveLocalCategories(shopCode, categories) {
+  const raw = window.localStorage.getItem(CATEGORY_STORAGE_KEY);
+  const parsed = raw ? JSON.parse(raw) : {};
+  parsed[shopCode] = categories;
+  window.localStorage.setItem(CATEGORY_STORAGE_KEY, JSON.stringify(parsed));
+}
+
+export function getActiveShop() {
+  return window.localStorage.getItem(ACTIVE_SHOP_KEY) || "default";
+}
+
+export function setActiveShop(shopCode) {
+  const nextShop = String(shopCode || "default").trim() || "default";
+  window.localStorage.setItem(ACTIVE_SHOP_KEY, nextShop);
+  return nextShop;
+}
+
 const localInventoryService = {
   async list() {
     return readLocal();
+  },
+  async listCategories(shopCode = "default") {
+    const itemCategories = readLocal().map((item) => item.category).filter(Boolean);
+    return [...new Set([...itemCategories, ...readLocalCategories(shopCode)])].sort((a, b) => a.localeCompare(b));
+  },
+  async createCategory(name, shopCode = "default") {
+    const category = String(name || "").trim();
+    if (!category) throw new Error("Category name is required.");
+    const categories = readLocalCategories(shopCode);
+    const next = categories.includes(category) ? categories : [...categories, category];
+    saveLocalCategories(shopCode, next);
+    return { name: category };
   },
   async create(item) {
     const state = readLocal();
@@ -115,6 +156,18 @@ const apiInventoryService = {
       await fetch(withBase(`/api/v1/inventory?shopCode=${encodeURIComponent(shopCode)}`)),
     );
     return Array.isArray(items) ? items.map(normalizeItem) : [];
+  },
+  async listCategories(shopCode = "default") {
+    return parseJsonResponse(await fetch(withBase(`/api/v1/categories?shopCode=${encodeURIComponent(shopCode)}`)));
+  },
+  async createCategory(name, shopCode = "default") {
+    return parseJsonResponse(
+      await fetch(withBase("/api/v1/categories"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, shopCode }),
+      }),
+    );
   },
   async create(input, shopCode = "default") {
     const created = await parseJsonResponse(

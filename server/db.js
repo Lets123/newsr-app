@@ -93,6 +93,15 @@ async function initPostgres() {
   `);
 
   await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_inventory_shop_sku ON inventory_items(shop_code, sku)`);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS inventory_categories (
+      id BIGSERIAL PRIMARY KEY,
+      shop_code TEXT NOT NULL DEFAULT 'default',
+      name TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      UNIQUE (shop_code, name)
+    )
+  `);
 
   const pgColumns = await pool.query(
     `SELECT column_name FROM information_schema.columns WHERE table_name = 'inventory_items'`,
@@ -110,6 +119,12 @@ async function initPostgres() {
          (sku, name, category, cost_price, selling_price, stock, reorder_level, image, shop_code, created_at, updated_at)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
         [...row, now, now],
+      );
+      await pool.query(
+        `INSERT INTO inventory_categories (shop_code, name, created_at)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (shop_code, name) DO NOTHING`,
+        [row[8], row[2], now],
       );
     }
   }
@@ -146,6 +161,15 @@ async function initSqlite() {
     await run(`ALTER TABLE inventory_items ADD COLUMN category TEXT NOT NULL DEFAULT ''`);
   }
   await run(`CREATE UNIQUE INDEX IF NOT EXISTS idx_inventory_shop_sku ON inventory_items(shop_code, sku)`);
+  await run(`
+    CREATE TABLE IF NOT EXISTS inventory_categories (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      shop_code TEXT NOT NULL DEFAULT 'default',
+      name TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      UNIQUE (shop_code, name)
+    )
+  `);
 
   const existing = await all("SELECT id FROM inventory_items WHERE is_deleted = 0 LIMIT 1");
   if (existing.length === 0) {
@@ -156,6 +180,10 @@ async function initSqlite() {
          (sku, name, category, cost_price, selling_price, stock, reorder_level, image, shop_code, created_at, updated_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [...row, now, now],
+      );
+      await run(
+        `INSERT OR IGNORE INTO inventory_categories (shop_code, name, created_at) VALUES (?, ?, ?)`,
+        [row[8], row[2], now],
       );
     }
   }
