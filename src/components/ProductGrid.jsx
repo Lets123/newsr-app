@@ -7,7 +7,7 @@ function ProductGrid({ products, query, setQuery, onAdd }) {
           type="search"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder="Search SKU or product..."
+          placeholder="Search SKU, product, category..."
           className="mt-2 w-full rounded-md border border-slate-300 bg-slate-50 px-2 py-1.5 text-sm outline-none ring-sky-300 transition focus:ring-2"
         />
       </header>
@@ -27,6 +27,11 @@ function ProductGrid({ products, query, setQuery, onAdd }) {
             <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
               {product.sku}
             </div>
+            {product.category ? (
+              <div className="mt-1 rounded bg-slate-100 px-1.5 py-0.5 text-[11px] font-semibold text-slate-600">
+                {product.category}
+              </div>
+            ) : null}
             <div className="mt-0.5 text-sm font-semibold text-slate-900">{product.name}</div>
             <div className="mt-1 text-xs text-slate-600">Stock: {product.stock}</div>
             <div className="mt-1 text-sm font-bold text-emerald-700">${product.price.toFixed(2)}</div>

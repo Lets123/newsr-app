@@ -63,6 +63,7 @@ function BillingPage() {
             id: item.id,
             sku: item.sku,
             name: item.name,
+            category: item.category || "",
             price: Number(item.sellingPrice || 0),
             stock: Number(item.stock || 0),
             image: item.image,
@@ -83,9 +84,11 @@ function BillingPage() {
     if (!value) return products;
     return products.filter(
       (product) =>
-        product.name.toLowerCase().includes(value) || product.sku.toLowerCase().includes(value),
+        product.name.toLowerCase().includes(value) ||
+        product.sku.toLowerCase().includes(value) ||
+        product.category.toLowerCase().includes(value),
     );
-  }, [query]);
+  }, [products, query]);
 
   const handleAdd = (product) => {
     const unitPrice = billType === "wholesale" ? Number((product.price * 0.9).toFixed(2)) : product.price;

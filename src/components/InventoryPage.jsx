@@ -298,18 +298,32 @@ function InventoryPage() {
           onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
           className="rounded-md border border-slate-300 px-2 py-1.5"
         />
-        <select
-          value={form.category}
-          onChange={(event) => setForm((prev) => ({ ...prev, category: event.target.value }))}
-          className="rounded-md border border-slate-300 px-2 py-1.5"
-        >
-          <option value="">Select category</option>
-          {categories.map((category) => (
-            <option key={category} value={category}>
-              {category}
-            </option>
-          ))}
-        </select>
+        <div className="grid grid-cols-[1fr_0.85fr] gap-1">
+          <input
+            list="inventory-categories"
+            placeholder="Type category"
+            value={form.category}
+            onChange={(event) => setForm((prev) => ({ ...prev, category: event.target.value }))}
+            className="min-w-0 rounded-md border border-slate-300 px-2 py-1.5"
+          />
+          <select
+            value={form.category}
+            onChange={(event) => setForm((prev) => ({ ...prev, category: event.target.value }))}
+            className="min-w-0 rounded-md border border-slate-300 px-2 py-1.5"
+          >
+            <option value="">Select</option>
+            {categories.map((category) => (
+              <option key={category} value={category}>
+                {category}
+              </option>
+            ))}
+          </select>
+          <datalist id="inventory-categories">
+            {categories.map((category) => (
+              <option key={category} value={category} />
+            ))}
+          </datalist>
+        </div>
         <input
           type="number"
           step="0.01"
