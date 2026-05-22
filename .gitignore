@@ -7,7 +7,7 @@ dist/
 .continue/
 .codex
 inventory-mobile-rn.tar.gz
-data/
+/data/
 mobile-rn/node_modules/
 mobile-rn/android/.gradle/
 mobile-rn/android/app/build/
