@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "dev:network": "vite --host",
-    "api": "node server/index.js",
+    "api": "node --dns-result-order=ipv4first server/index.js",
     "dev:all": "sh -c 'node server/index.js & vite --host'",
     "build": "vite build",
     "preview": "vite preview"
