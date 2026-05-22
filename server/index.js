@@ -1,6 +1,9 @@
+import dns from "node:dns";
 import express from "express";
 import cors from "cors";
 import { all, dbPath, initDb, nowIso, run, snapshotDb, usePostgres } from "./db.js";
+
+dns.setDefaultResultOrder("ipv4first");
 
 const app = express();
 const PORT = Number(process.env.PORT || 4000);
