@@ -39,6 +39,7 @@ function InventoryPage() {
   const [shopCode, setShopCode] = useState("default");
   const [importMode, setImportMode] = useState("merge");
   const [categoryDraft, setCategoryDraft] = useState("");
+  const [customCategories, setCustomCategories] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [autoPricing, setAutoPricing] = useState(false);
   const [editingId, setEditingId] = useState(null);
@@ -60,8 +61,11 @@ function InventoryPage() {
   const lowStockCount = useMemo(() => items.filter((item) => item.stock <= item.reorderLevel).length, [items]);
 
   const categories = useMemo(
-    () => [...new Set(items.map((item) => item.category).filter(Boolean))].sort((a, b) => a.localeCompare(b)),
-    [items],
+    () =>
+      [...new Set([...items.map((item) => item.category), ...customCategories].filter(Boolean))].sort((a, b) =>
+        a.localeCompare(b),
+      ),
+    [customCategories, items],
   );
 
   const visibleItems = useMemo(() => {
@@ -163,8 +167,8 @@ function InventoryPage() {
   const handleCreateCategory = () => {
     const nextCategory = categoryDraft.trim();
     if (!nextCategory) return;
+    setCustomCategories((prev) => (prev.includes(nextCategory) ? prev : [...prev, nextCategory]));
     setForm((prev) => ({ ...prev, category: nextCategory }));
-    setSearchTerm(nextCategory);
     setCategoryDraft("");
   };
 
@@ -257,7 +261,7 @@ function InventoryPage() {
             Create DB Backup
           </button>
         </div>
-        <div className="mt-2 grid gap-2 sm:grid-cols-3">
+        <div className="mt-2 grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
           <input
             value={searchTerm}
             onChange={(event) => setSearchTerm(event.target.value)}
@@ -273,7 +277,7 @@ function InventoryPage() {
           <button
             type="button"
             onClick={handleCreateCategory}
-            className="rounded-md border border-sky-300 px-3 py-1.5 text-sm font-semibold text-sky-700"
+            className="rounded-md border border-sky-300 px-4 py-2 text-sm font-semibold text-sky-700"
           >
             Add Category
           </button>
@@ -298,26 +302,14 @@ function InventoryPage() {
           onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
           className="rounded-md border border-slate-300 px-2 py-1.5"
         />
-        <div className="grid grid-cols-[1fr_0.85fr] gap-1">
+        <div>
           <input
             list="inventory-categories"
-            placeholder="Type category"
+            placeholder="Search/select category"
             value={form.category}
             onChange={(event) => setForm((prev) => ({ ...prev, category: event.target.value }))}
-            className="min-w-0 rounded-md border border-slate-300 px-2 py-1.5"
+            className="w-full rounded-md border border-slate-300 px-3 py-2"
           />
-          <select
-            value={form.category}
-            onChange={(event) => setForm((prev) => ({ ...prev, category: event.target.value }))}
-            className="min-w-0 rounded-md border border-slate-300 px-2 py-1.5"
-          >
-            <option value="">Select</option>
-            {categories.map((category) => (
-              <option key={category} value={category}>
-                {category}
-              </option>
-            ))}
-          </select>
           <datalist id="inventory-categories">
             {categories.map((category) => (
               <option key={category} value={category} />
