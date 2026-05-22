@@ -1,6 +1,5 @@
 import fs from "node:fs";
 import path from "node:path";
-import sqlite3 from "sqlite3";
 import pg from "pg";
 
 const { Pool } = pg;
@@ -26,6 +25,7 @@ const seedRows = [
 
 let db = null;
 let pool = null;
+let sqlite3 = null;
 
 function toPgSql(sql) {
   let idx = 0;
@@ -101,6 +101,8 @@ async function initPostgres() {
 }
 
 async function initSqlite() {
+  const sqliteModule = await import("sqlite3");
+  sqlite3 = sqliteModule.default || sqliteModule;
   sqlite3.verbose();
   db = new sqlite3.Database(dbPath);
 
