@@ -14,3 +14,9 @@ services:
         sync: false
       - key: APP_PASSWORD
         sync: false
+      - key: ANDROID_APP_VERSION
+        sync: false
+      - key: ANDROID_APP_DOWNLOAD_URL
+        sync: false
+      - key: ANDROID_APP_NOTES
+        sync: false

@@ -102,6 +102,16 @@ async function initPostgres() {
       UNIQUE (shop_code, name)
     )
   `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS app_release (
+      id BIGSERIAL PRIMARY KEY,
+      version TEXT NOT NULL DEFAULT '',
+      download_url TEXT NOT NULL DEFAULT '',
+      notes TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    )
+  `);
 
   const pgColumns = await pool.query(
     `SELECT column_name FROM information_schema.columns WHERE table_name = 'inventory_items'`,
@@ -127,6 +137,16 @@ async function initPostgres() {
         [row[8], row[2], now],
       );
     }
+  }
+
+  const release = await pool.query(`SELECT id FROM app_release ORDER BY id DESC LIMIT 1`);
+  if (release.rows.length === 0) {
+    const now = nowIso();
+    await pool.query(
+      `INSERT INTO app_release (version, download_url, notes, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5)`,
+      ["", "", "", now, now],
+    );
   }
 }
 
@@ -170,6 +190,16 @@ async function initSqlite() {
       UNIQUE (shop_code, name)
     )
   `);
+  await run(`
+    CREATE TABLE IF NOT EXISTS app_release (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      version TEXT NOT NULL DEFAULT '',
+      download_url TEXT NOT NULL DEFAULT '',
+      notes TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    )
+  `);
 
   const existing = await all("SELECT id FROM inventory_items WHERE is_deleted = 0 LIMIT 1");
   if (existing.length === 0) {
@@ -186,6 +216,16 @@ async function initSqlite() {
         [row[8], row[2], now],
       );
     }
+  }
+
+  const release = await all(`SELECT id FROM app_release ORDER BY id DESC LIMIT 1`);
+  if (release.length === 0) {
+    const now = nowIso();
+    await run(
+      `INSERT INTO app_release (version, download_url, notes, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?)`,
+      ["", "", "", now, now],
+    );
   }
 }
 

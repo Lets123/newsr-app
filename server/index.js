@@ -14,14 +14,19 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const clientDist = path.resolve(__dirname, "../dist");
 const hasClientDist = fs.existsSync(clientDist);
+const downloadsDir = path.resolve(process.cwd(), "downloads");
+const downloadsFallbacks = ["latest.apk", "app-release.apk"];
 const authUser = String(process.env.APP_USERNAME || "").trim();
 const authPass = String(process.env.APP_PASSWORD || "").trim();
 
 app.use(cors());
 app.use(express.json({ limit: "12mb" }));
+app.use("/downloads", express.static(downloadsDir));
 
 function requireBasicAuth(req, res, next) {
   if (req.path === "/api/v1/health") return next();
+  if (req.path === "/api/v1/app-release") return next();
+  if (req.path.startsWith("/downloads/")) return next();
   if (!authUser || !authPass) return next();
 
   const header = String(req.headers.authorization || "");
@@ -41,6 +46,39 @@ app.use(requireBasicAuth);
 
 app.get("/api/v1/health", (_req, res) => {
   res.json({ ok: true, service: "inventory-api" });
+});
+
+app.get("/api/v1/app-release", async (_req, res) => {
+  try {
+    const [release] = await all(
+      `SELECT id, version, download_url AS downloadUrl, notes, updated_at AS updatedAt
+       FROM app_release
+       ORDER BY id DESC
+       LIMIT 1`,
+    );
+    const downloadCandidate = downloadsFallbacks.find((name) => fs.existsSync(path.join(downloadsDir, name)));
+    const fallbackDownloadUrl = downloadCandidate ? `/downloads/${downloadCandidate}` : "";
+    const defaults = {
+      id: null,
+      version: String(process.env.ANDROID_APP_VERSION || "").trim(),
+      downloadUrl: String(process.env.ANDROID_APP_DOWNLOAD_URL || fallbackDownloadUrl || "").trim(),
+      notes: String(process.env.ANDROID_APP_NOTES || "").trim(),
+      updatedAt: null,
+    };
+    res.json(
+      release
+        ? {
+            id: release.id,
+            version: release.version || defaults.version,
+            downloadUrl: release.downloadUrl || defaults.downloadUrl,
+            notes: release.notes || defaults.notes,
+            updatedAt: release.updatedAt,
+          }
+        : defaults,
+    );
+  } catch (error) {
+    res.status(500).json({ error: error.message || "Could not load release info." });
+  }
 });
 
 app.get("/", (_req, res, next) => {
@@ -300,6 +338,41 @@ app.get("/api/v1/backups/create", async (_req, res) => {
     res.json({ ok: true, file, dbPath });
   } catch (error) {
     res.status(500).json({ error: error.message || "Could not create backup." });
+  }
+});
+
+app.put("/api/v1/app-release", async (req, res) => {
+  try {
+    const version = String(req.body?.version || "").trim();
+    const downloadUrl = String(req.body?.downloadUrl || "").trim();
+    const notes = String(req.body?.notes || "").trim();
+    const now = nowIso();
+    const existing = await all(`SELECT id FROM app_release ORDER BY id DESC LIMIT 1`);
+
+    if (existing.length > 0) {
+      await run(
+        `UPDATE app_release
+         SET version = ?, download_url = ?, notes = ?, updated_at = ?
+         WHERE id = ?`,
+        [version, downloadUrl, notes, now, existing[0].id],
+      );
+    } else {
+      await run(
+        `INSERT INTO app_release (version, download_url, notes, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?)`,
+        [version, downloadUrl, notes, now, now],
+      );
+    }
+
+    const [release] = await all(
+      `SELECT id, version, download_url AS downloadUrl, notes, updated_at AS updatedAt
+       FROM app_release
+       ORDER BY id DESC
+       LIMIT 1`,
+    );
+    res.json({ ok: true, release });
+  } catch (error) {
+    res.status(500).json({ error: error.message || "Could not save release info." });
   }
 });
 

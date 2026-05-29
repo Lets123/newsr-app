@@ -10,6 +10,7 @@ import OtherIncomePage from "./components/OtherIncomePage";
 import LedgerPage from "./components/LedgerPage";
 import ReportsPage from "./components/ReportsPage";
 import StockSetupPage from "./components/StockSetupPage";
+import SettingsPage from "./components/SettingsPage";
 
 function App() {
   return (
@@ -29,6 +30,7 @@ function App() {
             <Route path="/other-income" element={<OtherIncomePage />} />
             <Route path="/ledger" element={<LedgerPage />} />
             <Route path="/reports" element={<ReportsPage />} />
+            <Route path="/settings" element={<SettingsPage />} />
           </Routes>
         </main>
       </div>
