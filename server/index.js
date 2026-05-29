@@ -18,9 +18,7 @@ const downloadsDir = path.resolve(process.cwd(), "downloads");
 const downloadsFallbacks = ["latest.apk", "app-release.apk"];
 const androidReleaseOwner = String(process.env.ANDROID_RELEASE_OWNER || "Lets123").trim();
 const androidReleaseRepo = String(process.env.ANDROID_RELEASE_REPO || "newsr-app").trim();
-const androidReleaseAsset = String(process.env.ANDROID_RELEASE_ASSET || "newsr-app-release.apk").trim();
 const androidReleaseApiUrl = `https://api.github.com/repos/${androidReleaseOwner}/${androidReleaseRepo}/releases/latest`;
-const androidReleaseDownloadUrl = `https://github.com/${androidReleaseOwner}/${androidReleaseRepo}/releases/latest/download/${androidReleaseAsset}`;
 const androidReleasePageUrl = `https://github.com/${androidReleaseOwner}/${androidReleaseRepo}/releases/latest`;
 const githubToken = String(process.env.GITHUB_TOKEN || "").trim();
 const authUser = String(process.env.APP_USERNAME || "").trim();
@@ -66,19 +64,23 @@ async function fetchAndroidRelease() {
       throw new Error(`GitHub release lookup failed: ${response.status}`);
     }
     const release = await response.json();
-    const asset = Array.isArray(release.assets)
-      ? release.assets.find((item) => item?.name === androidReleaseAsset)
-      : null;
+    const assets = Array.isArray(release.assets) ? release.assets : [];
+    const asset =
+      assets.find((item) => item?.name === "newsr-app-release.apk") ||
+      assets.find((item) => item?.name === "app-release.apk") ||
+      assets.find((item) => String(item?.name || "").endsWith(".apk")) ||
+      null;
+    const downloadUrl = String(asset?.browser_download_url || asset?.url || "");
 
     return {
       id: release.id ?? null,
       version: String(release.name || release.tag_name || "Latest Android build"),
       notes: String(release.body || "").trim(),
-      downloadUrl: "/api/v1/android-download",
+      downloadUrl: downloadUrl || "/api/v1/android-download",
       releaseUrl: String(release.html_url || androidReleasePageUrl),
-      assetName: asset?.name || androidReleaseAsset,
+      assetName: asset?.name || "app-release.apk",
       updatedAt: release.published_at || null,
-      hasRelease: true,
+      hasRelease: Boolean(asset),
     };
   } catch (error) {
     return {
@@ -87,7 +89,7 @@ async function fetchAndroidRelease() {
       notes: String(process.env.ANDROID_APP_NOTES || "").trim(),
       downloadUrl: "/api/v1/android-download",
       releaseUrl: androidReleasePageUrl,
-      assetName: androidReleaseAsset,
+      assetName: "app-release.apk",
       updatedAt: null,
       hasRelease: false,
       error: error.message || "Could not load Android release.",
@@ -110,7 +112,11 @@ app.get("/api/v1/app-release", async (_req, res) => {
 
 app.get("/api/v1/android-download", async (_req, res) => {
   const release = await fetchAndroidRelease();
-  res.redirect(302, androidReleaseDownloadUrl);
+  if (release.downloadUrl && release.downloadUrl !== "/api/v1/android-download") {
+    res.redirect(302, release.downloadUrl);
+    return;
+  }
+  res.redirect(302, androidReleasePageUrl);
 });
 
 app.get("/", (_req, res, next) => {
