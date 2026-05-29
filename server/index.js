@@ -1,4 +1,7 @@
+import fs from "node:fs";
 import dns from "node:dns";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import express from "express";
 import cors from "cors";
 import { all, dbPath, initDb, nowIso, run, snapshotDb, usePostgres } from "./db.js";
@@ -7,12 +10,44 @@ dns.setDefaultResultOrder("ipv4first");
 
 const app = express();
 const PORT = Number(process.env.PORT || 4000);
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const clientDist = path.resolve(__dirname, "../dist");
+const hasClientDist = fs.existsSync(clientDist);
+const authUser = String(process.env.APP_USERNAME || "").trim();
+const authPass = String(process.env.APP_PASSWORD || "").trim();
 
 app.use(cors());
 app.use(express.json({ limit: "12mb" }));
 
+function requireBasicAuth(req, res, next) {
+  if (req.path === "/api/v1/health") return next();
+  if (!authUser || !authPass) return next();
+
+  const header = String(req.headers.authorization || "");
+  if (header.startsWith("Basic ")) {
+    const decoded = Buffer.from(header.slice(6), "base64").toString("utf8");
+    const sep = decoded.indexOf(":");
+    const user = sep >= 0 ? decoded.slice(0, sep) : "";
+    const pass = sep >= 0 ? decoded.slice(sep + 1) : "";
+    if (user === authUser && pass === authPass) return next();
+  }
+
+  res.setHeader("WWW-Authenticate", 'Basic realm="newsr-app"');
+  return res.status(401).send("Authentication required");
+}
+
+app.use(requireBasicAuth);
+
 app.get("/api/v1/health", (_req, res) => {
   res.json({ ok: true, service: "inventory-api" });
+});
+
+app.get("/", (_req, res, next) => {
+  if (hasClientDist) {
+    return res.sendFile(path.join(clientDist, "index.html"));
+  }
+  return next();
 });
 
 app.get("/api/v1/inventory", async (_req, res) => {
@@ -267,6 +302,21 @@ app.get("/api/v1/backups/create", async (_req, res) => {
     res.status(500).json({ error: error.message || "Could not create backup." });
   }
 });
+
+if (hasClientDist) {
+  app.use(express.static(clientDist));
+  app.use((req, res, next) => {
+    if (req.path.startsWith("/api/")) {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
+    if (req.method !== "GET" && req.method !== "HEAD") {
+      next();
+      return;
+    }
+    res.sendFile(path.join(clientDist, "index.html"));
+  });
+}
 
 initDb()
   .then(() => {
