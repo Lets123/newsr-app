@@ -14,9 +14,11 @@ services:
         sync: false
       - key: APP_PASSWORD
         sync: false
-      - key: ANDROID_APP_VERSION
+      - key: ANDROID_RELEASE_OWNER
         sync: false
-      - key: ANDROID_APP_DOWNLOAD_URL
+      - key: ANDROID_RELEASE_REPO
         sync: false
-      - key: ANDROID_APP_NOTES
+      - key: ANDROID_RELEASE_ASSET
+        sync: false
+      - key: GITHUB_TOKEN
         sync: false

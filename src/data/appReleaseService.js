@@ -6,41 +6,17 @@ async function parseJsonResponse(response) {
   return payload;
 }
 
-function resolveDownloadUrl(downloadUrl) {
-  const value = String(downloadUrl || "").trim();
-  if (!value) return "";
-  if (value.startsWith("http://") || value.startsWith("https://")) return value;
-  return new URL(value, window.location.origin).toString();
-}
-
 export async function fetchAppRelease() {
   const payload = await parseJsonResponse(await fetch("/api/v1/app-release"));
   return {
     id: payload.id ?? null,
     version: String(payload.version || ""),
-    downloadUrl: resolveDownloadUrl(payload.downloadUrl),
     notes: String(payload.notes || ""),
+    downloadUrl: String(payload.downloadUrl || "/api/v1/android-download"),
+    releaseUrl: String(payload.releaseUrl || "https://github.com/Lets123/newsr-app/releases/latest"),
+    assetName: String(payload.assetName || "newsr-app-release.apk"),
     updatedAt: payload.updatedAt || null,
-  };
-}
-
-export async function saveAppRelease(release) {
-  const payload = await parseJsonResponse(
-    await fetch("/api/v1/app-release", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(release),
-    }),
-  );
-
-  return {
-    ok: true,
-    release: {
-      id: payload.release?.id ?? null,
-      version: String(payload.release?.version || ""),
-      downloadUrl: resolveDownloadUrl(payload.release?.downloadUrl),
-      notes: String(payload.release?.notes || ""),
-      updatedAt: payload.release?.updatedAt || null,
-    },
+    hasRelease: Boolean(payload.hasRelease),
+    error: String(payload.error || ""),
   };
 }

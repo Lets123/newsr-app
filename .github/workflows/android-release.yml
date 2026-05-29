@@ -1,0 +1,68 @@
+name: Build Android Release
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - "mobile-rn/**"
+      - ".github/workflows/android-release.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-release:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: mobile-rn
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: mobile-rn/package-lock.json
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: "platform-tools platforms;android-35 build-tools;35.0.0 ndk;26.1.10909125"
+
+      - name: Install JS dependencies
+        run: npm ci
+
+      - name: Build release APK
+        run: |
+          chmod +x android/gradlew
+          ./android/gradlew --no-daemon assembleRelease \
+            -PversionCode=${{ github.run_number }} \
+            -PversionName=1.0.${{ github.run_number }}
+
+      - name: Prepare release asset
+        run: |
+          mkdir -p release-artifacts
+          cp android/app/build/outputs/apk/release/app-release.apk release-artifacts/newsr-app-release.apk
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: android-v${{ github.run_number }}
+          name: Android build ${{ github.run_number }}
+          body: |
+            Automated Android APK built from commit `${{ github.sha }}`.
+          files: release-artifacts/newsr-app-release.apk

@@ -16,6 +16,13 @@ const clientDist = path.resolve(__dirname, "../dist");
 const hasClientDist = fs.existsSync(clientDist);
 const downloadsDir = path.resolve(process.cwd(), "downloads");
 const downloadsFallbacks = ["latest.apk", "app-release.apk"];
+const androidReleaseOwner = String(process.env.ANDROID_RELEASE_OWNER || "Lets123").trim();
+const androidReleaseRepo = String(process.env.ANDROID_RELEASE_REPO || "newsr-app").trim();
+const androidReleaseAsset = String(process.env.ANDROID_RELEASE_ASSET || "newsr-app-release.apk").trim();
+const androidReleaseApiUrl = `https://api.github.com/repos/${androidReleaseOwner}/${androidReleaseRepo}/releases/latest`;
+const androidReleaseDownloadUrl = `https://github.com/${androidReleaseOwner}/${androidReleaseRepo}/releases/latest/download/${androidReleaseAsset}`;
+const androidReleasePageUrl = `https://github.com/${androidReleaseOwner}/${androidReleaseRepo}/releases/latest`;
+const githubToken = String(process.env.GITHUB_TOKEN || "").trim();
 const authUser = String(process.env.APP_USERNAME || "").trim();
 const authPass = String(process.env.APP_PASSWORD || "").trim();
 
@@ -26,6 +33,7 @@ app.use("/downloads", express.static(downloadsDir));
 function requireBasicAuth(req, res, next) {
   if (req.path === "/api/v1/health") return next();
   if (req.path === "/api/v1/app-release") return next();
+  if (req.path === "/api/v1/android-download") return next();
   if (req.path.startsWith("/downloads/")) return next();
   if (!authUser || !authPass) return next();
 
@@ -44,41 +52,65 @@ function requireBasicAuth(req, res, next) {
 
 app.use(requireBasicAuth);
 
+async function fetchAndroidRelease() {
+  try {
+    const response = await fetch(androidReleaseApiUrl, {
+      headers: {
+        Accept: "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+        "User-Agent": "newsr-app",
+        ...(githubToken ? { Authorization: `Bearer ${githubToken}` } : {}),
+      },
+    });
+    if (!response.ok) {
+      throw new Error(`GitHub release lookup failed: ${response.status}`);
+    }
+    const release = await response.json();
+    const asset = Array.isArray(release.assets)
+      ? release.assets.find((item) => item?.name === androidReleaseAsset)
+      : null;
+
+    return {
+      id: release.id ?? null,
+      version: String(release.name || release.tag_name || "Latest Android build"),
+      notes: String(release.body || "").trim(),
+      downloadUrl: "/api/v1/android-download",
+      releaseUrl: String(release.html_url || androidReleasePageUrl),
+      assetName: asset?.name || androidReleaseAsset,
+      updatedAt: release.published_at || null,
+      hasRelease: true,
+    };
+  } catch (error) {
+    return {
+      id: null,
+      version: String(process.env.ANDROID_APP_VERSION || "").trim(),
+      notes: String(process.env.ANDROID_APP_NOTES || "").trim(),
+      downloadUrl: "/api/v1/android-download",
+      releaseUrl: androidReleasePageUrl,
+      assetName: androidReleaseAsset,
+      updatedAt: null,
+      hasRelease: false,
+      error: error.message || "Could not load Android release.",
+    };
+  }
+}
+
 app.get("/api/v1/health", (_req, res) => {
   res.json({ ok: true, service: "inventory-api" });
 });
 
 app.get("/api/v1/app-release", async (_req, res) => {
   try {
-    const [release] = await all(
-      `SELECT id, version, download_url AS "downloadUrl", notes, updated_at AS "updatedAt"
-       FROM app_release
-       ORDER BY id DESC
-       LIMIT 1`,
-    );
-    const downloadCandidate = downloadsFallbacks.find((name) => fs.existsSync(path.join(downloadsDir, name)));
-    const fallbackDownloadUrl = downloadCandidate ? `/downloads/${downloadCandidate}` : "";
-    const defaults = {
-      id: null,
-      version: String(process.env.ANDROID_APP_VERSION || "").trim(),
-      downloadUrl: String(process.env.ANDROID_APP_DOWNLOAD_URL || fallbackDownloadUrl || "").trim(),
-      notes: String(process.env.ANDROID_APP_NOTES || "").trim(),
-      updatedAt: null,
-    };
-    res.json(
-      release
-        ? {
-            id: release.id,
-            version: release.version || defaults.version,
-            downloadUrl: release.downloadUrl || defaults.downloadUrl,
-            notes: release.notes || defaults.notes,
-            updatedAt: release.updatedAt,
-          }
-        : defaults,
-    );
+    const release = await fetchAndroidRelease();
+    res.json(release);
   } catch (error) {
     res.status(500).json({ error: error.message || "Could not load release info." });
   }
+});
+
+app.get("/api/v1/android-download", async (_req, res) => {
+  const release = await fetchAndroidRelease();
+  res.redirect(302, androidReleaseDownloadUrl);
 });
 
 app.get("/", (_req, res, next) => {
