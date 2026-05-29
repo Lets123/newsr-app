@@ -51,7 +51,7 @@ app.get("/api/v1/health", (_req, res) => {
 app.get("/api/v1/app-release", async (_req, res) => {
   try {
     const [release] = await all(
-      `SELECT id, version, download_url AS downloadUrl, notes, updated_at AS updatedAt
+      `SELECT id, version, download_url AS "downloadUrl", notes, updated_at AS "updatedAt"
        FROM app_release
        ORDER BY id DESC
        LIMIT 1`,
@@ -365,7 +365,7 @@ app.put("/api/v1/app-release", async (req, res) => {
     }
 
     const [release] = await all(
-      `SELECT id, version, download_url AS downloadUrl, notes, updated_at AS updatedAt
+      `SELECT id, version, download_url AS "downloadUrl", notes, updated_at AS "updatedAt"
        FROM app_release
        ORDER BY id DESC
        LIMIT 1`,
