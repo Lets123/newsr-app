@@ -92,6 +92,16 @@ async function initPostgres() {
     )
   `);
 
+  const pgColumns = await pool.query(
+    `SELECT column_name FROM information_schema.columns WHERE table_name = 'inventory'`,
+  );
+  if (!pgColumns.rows.some((col) => col.column_name === "shop_code")) {
+    await pool.query(`ALTER TABLE inventory ADD COLUMN shop_code TEXT NOT NULL DEFAULT 'default'`);
+  }
+  if (!pgColumns.rows.some((col) => col.column_name === "category")) {
+    await pool.query(`ALTER TABLE inventory ADD COLUMN category TEXT NOT NULL DEFAULT ''`);
+  }
+
   await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_inventory_shop_sku ON inventory(shop_code, sku)`);
   await pool.query(`
     CREATE TABLE IF NOT EXISTS inventory_categories (
@@ -112,13 +122,6 @@ async function initPostgres() {
       updated_at TEXT NOT NULL
     )
   `);
-
-  const pgColumns = await pool.query(
-    `SELECT column_name FROM information_schema.columns WHERE table_name = 'inventory'`,
-  );
-  if (!pgColumns.rows.some((col) => col.column_name === "category")) {
-    await pool.query(`ALTER TABLE inventory ADD COLUMN category TEXT NOT NULL DEFAULT ''`);
-  }
 
   const existing = await pool.query("SELECT id FROM inventory WHERE is_deleted = 0 LIMIT 1");
   if (existing.rows.length === 0) {
