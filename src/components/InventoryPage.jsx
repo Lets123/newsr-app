@@ -64,6 +64,12 @@ function InventoryPage() {
   useEffect(() => {
     loadItems();
     loadCategories();
+
+    const interval = setInterval(() => {
+      loadItems();
+    }, 5000);
+
+    return () => clearInterval(interval);
   }, [shopCode]);
 
   const lowStockCount = useMemo(() => items.filter((item) => item.stock <= item.reorderLevel).length, [items]);

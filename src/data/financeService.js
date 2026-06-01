@@ -18,7 +18,7 @@ import {
   validateCreatePaymentPayload,
 } from "../api/financeContracts";
 
-const useApi = String(import.meta.env.VITE_USE_API || "").toLowerCase() === "true";
+const useApi = String(import.meta.env.VITE_USE_API ?? "true").toLowerCase() !== "false";
 
 async function parseJsonResponse(response) {
   const payload = await response.json().catch(() => ({}));

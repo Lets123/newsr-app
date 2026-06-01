@@ -13,7 +13,7 @@ import {
 } from "react-native";
 import { launchCamera, launchImageLibrary } from "react-native-image-picker";
 
-const API_BASE_URL = "http://10.0.2.2:4000";
+const API_BASE_URL = "https://newsr-app.onrender.com";
 
 async function parseJsonResponse(response) {
   const payload = await response.json().catch(() => ({}));
@@ -49,6 +49,12 @@ function InventoryScreen() {
 
   useEffect(() => {
     loadInventory();
+
+    const interval = setInterval(() => {
+      loadInventory();
+    }, 5000);
+
+    return () => clearInterval(interval);
   }, []);
 
   const calculatedSellingPrice = useMemo(() => {

@@ -1,14 +1,22 @@
 import React from "react";
-import { SafeAreaView, StatusBar } from "react-native";
-import InventoryScreen from "./src/screens/InventoryScreen";
+import { SafeAreaView, StatusBar, StyleSheet, View } from "react-native";
+import { WebView } from "react-native-webview";
 
-function App(): React.JSX.Element {
+const APP_URL = "https://newsr-app.onrender.com";
+
+export default function App() {
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: "#f3f4f6" }}>
+    <SafeAreaView style={styles.safe}>
       <StatusBar barStyle="dark-content" backgroundColor="#f3f4f6" />
-      <InventoryScreen />
+      <View style={styles.container}>
+        <WebView source={{ uri: APP_URL }} style={styles.webview} />
+      </View>
     </SafeAreaView>
   );
 }
 
-export default App;
+const styles = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: "#f3f4f6" },
+  container: { flex: 1 },
+  webview: { flex: 1 },
+});

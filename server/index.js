@@ -50,6 +50,13 @@ function requireBasicAuth(req, res, next) {
 
 app.use(requireBasicAuth);
 
+app.use((req, res, next) => {
+  if (req.path.startsWith("/api/")) {
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+  }
+  next();
+});
+
 async function fetchAndroidRelease() {
   try {
     const response = await fetch(androidReleaseApiUrl, {
@@ -132,7 +139,7 @@ app.get("/api/v1/inventory", async (_req, res) => {
     const rows = await all(
       `SELECT id, sku, name, category, cost_price AS costPrice, selling_price AS sellingPrice,
               stock, reorder_level AS reorderLevel, image
-       FROM inventory_items
+       FROM inventory
        WHERE is_deleted = 0 AND shop_code = ?
        ORDER BY id DESC`,
       [shopCode],
@@ -193,7 +200,7 @@ app.post("/api/v1/inventory", async (req, res) => {
       });
     }
     const result = await run(
-      `INSERT INTO inventory_items
+      `INSERT INTO inventory
        (sku, name, category, cost_price, selling_price, stock, reorder_level, image, shop_code, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
@@ -215,7 +222,7 @@ app.post("/api/v1/inventory", async (req, res) => {
     const [created] = await all(
       `SELECT id, sku, name, category, cost_price AS costPrice, selling_price AS sellingPrice,
               stock, reorder_level AS reorderLevel, image
-       FROM inventory_items WHERE shop_code = ? AND sku = ? AND is_deleted = 0
+       FROM inventory WHERE shop_code = ? AND sku = ? AND is_deleted = 0
        ORDER BY id DESC LIMIT 1`,
       [shop, String(sku).trim()],
     );
@@ -238,7 +245,7 @@ app.put("/api/v1/inventory/:id", async (req, res) => {
 
     const now = nowIso();
     await run(
-      `UPDATE inventory_items
+      `UPDATE inventory
        SET name = COALESCE(?, name),
            category = COALESCE(?, category),
            cost_price = COALESCE(?, cost_price),
@@ -265,7 +272,7 @@ app.put("/api/v1/inventory/:id", async (req, res) => {
     const [updated] = await all(
       `SELECT id, sku, name, category, cost_price AS costPrice, selling_price AS sellingPrice,
               stock, reorder_level AS reorderLevel, image
-       FROM inventory_items WHERE id = ? AND is_deleted = 0`,
+       FROM inventory WHERE id = ? AND is_deleted = 0`,
       [id],
     );
     if (!updated) return res.status(404).json({ error: "Product not found." });
@@ -279,7 +286,7 @@ app.delete("/api/v1/inventory/:id", async (req, res) => {
   try {
     const id = Number(req.params.id);
     if (!id) return res.status(400).json({ error: "Invalid id." });
-    await run(`UPDATE inventory_items SET is_deleted = 1, updated_at = ? WHERE id = ?`, [nowIso(), id]);
+    await run(`UPDATE inventory SET is_deleted = 1, updated_at = ? WHERE id = ?`, [nowIso(), id]);
     await snapshotDb("write");
     res.json({ ok: true });
   } catch (error) {
@@ -293,7 +300,7 @@ app.get("/api/v1/inventory/export", async (req, res) => {
     const items = await all(
       `SELECT sku, name, category, cost_price AS costPrice, selling_price AS sellingPrice,
               stock, reorder_level AS reorderLevel, image
-       FROM inventory_items
+       FROM inventory
        WHERE is_deleted = 0 AND shop_code = ?
        ORDER BY id DESC`,
       [shopCode],
@@ -313,7 +320,7 @@ app.post("/api/v1/inventory/import", async (req, res) => {
       return res.status(400).json({ error: "items array is required." });
     }
     if (importMode === "replace") {
-      await run(`UPDATE inventory_items SET is_deleted = 1, updated_at = ? WHERE shop_code = ?`, [nowIso(), shop]);
+      await run(`UPDATE inventory SET is_deleted = 1, updated_at = ? WHERE shop_code = ?`, [nowIso(), shop]);
     }
 
     for (const item of items) {
@@ -321,12 +328,12 @@ app.post("/api/v1/inventory/import", async (req, res) => {
       const name = String(item.name || "").trim();
       if (!sku || !name) continue;
       const existing = await all(
-        `SELECT id FROM inventory_items WHERE shop_code = ? AND sku = ? LIMIT 1`,
+        `SELECT id FROM inventory WHERE shop_code = ? AND sku = ? LIMIT 1`,
         [shop, sku],
       );
       if (existing.length > 0) {
         await run(
-          `UPDATE inventory_items SET
+          `UPDATE inventory SET
             name = ?, category = ?, cost_price = ?, selling_price = ?, stock = ?, reorder_level = ?,
             image = ?, is_deleted = 0, updated_at = ?
            WHERE id = ?`,
@@ -344,7 +351,7 @@ app.post("/api/v1/inventory/import", async (req, res) => {
         );
       } else {
         await run(
-          `INSERT INTO inventory_items
+          `INSERT INTO inventory
            (sku, name, category, cost_price, selling_price, stock, reorder_level, image, shop_code, created_at, updated_at)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [

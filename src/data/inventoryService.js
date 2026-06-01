@@ -29,7 +29,7 @@ async function parseJsonResponse(response) {
   return payload;
 }
 
-const useApi = String(import.meta.env.VITE_USE_API || "").toLowerCase() === "true";
+const useApi = String(import.meta.env.VITE_USE_API ?? "true").toLowerCase() !== "false";
 const apiBase = (import.meta.env.VITE_API_BASE_URL || "").trim();
 const withBase = (path) => `${apiBase}${path}`;
 

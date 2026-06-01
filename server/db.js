@@ -75,7 +75,7 @@ async function initPostgres() {
   });
 
   await pool.query(`
-    CREATE TABLE IF NOT EXISTS inventory_items (
+    CREATE TABLE IF NOT EXISTS inventory (
       id BIGSERIAL PRIMARY KEY,
       sku TEXT NOT NULL,
       name TEXT NOT NULL,
@@ -92,7 +92,7 @@ async function initPostgres() {
     )
   `);
 
-  await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_inventory_shop_sku ON inventory_items(shop_code, sku)`);
+  await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_inventory_shop_sku ON inventory(shop_code, sku)`);
   await pool.query(`
     CREATE TABLE IF NOT EXISTS inventory_categories (
       id BIGSERIAL PRIMARY KEY,
@@ -114,18 +114,18 @@ async function initPostgres() {
   `);
 
   const pgColumns = await pool.query(
-    `SELECT column_name FROM information_schema.columns WHERE table_name = 'inventory_items'`,
+    `SELECT column_name FROM information_schema.columns WHERE table_name = 'inventory'`,
   );
   if (!pgColumns.rows.some((col) => col.column_name === "category")) {
-    await pool.query(`ALTER TABLE inventory_items ADD COLUMN category TEXT NOT NULL DEFAULT ''`);
+    await pool.query(`ALTER TABLE inventory ADD COLUMN category TEXT NOT NULL DEFAULT ''`);
   }
 
-  const existing = await pool.query("SELECT id FROM inventory_items WHERE is_deleted = 0 LIMIT 1");
+  const existing = await pool.query("SELECT id FROM inventory WHERE is_deleted = 0 LIMIT 1");
   if (existing.rows.length === 0) {
     const now = nowIso();
     for (const row of seedRows) {
       await pool.query(
-        `INSERT INTO inventory_items
+        `INSERT INTO inventory
          (sku, name, category, cost_price, selling_price, stock, reorder_level, image, shop_code, created_at, updated_at)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
         [...row, now, now],
@@ -157,7 +157,7 @@ async function initSqlite() {
   db = new sqlite3.Database(dbPath);
 
   await run(`
-    CREATE TABLE IF NOT EXISTS inventory_items (
+    CREATE TABLE IF NOT EXISTS inventory (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       sku TEXT NOT NULL,
       name TEXT NOT NULL,
@@ -173,14 +173,14 @@ async function initSqlite() {
       updated_at TEXT NOT NULL
     )
   `);
-  const cols = await all(`PRAGMA table_info(inventory_items)`);
+  const cols = await all(`PRAGMA table_info(inventory)`);
   if (!cols.some((col) => col.name === "shop_code")) {
-    await run(`ALTER TABLE inventory_items ADD COLUMN shop_code TEXT NOT NULL DEFAULT 'default'`);
+    await run(`ALTER TABLE inventory ADD COLUMN shop_code TEXT NOT NULL DEFAULT 'default'`);
   }
   if (!cols.some((col) => col.name === "category")) {
-    await run(`ALTER TABLE inventory_items ADD COLUMN category TEXT NOT NULL DEFAULT ''`);
+    await run(`ALTER TABLE inventory ADD COLUMN category TEXT NOT NULL DEFAULT ''`);
   }
-  await run(`CREATE UNIQUE INDEX IF NOT EXISTS idx_inventory_shop_sku ON inventory_items(shop_code, sku)`);
+  await run(`CREATE UNIQUE INDEX IF NOT EXISTS idx_inventory_shop_sku ON inventory(shop_code, sku)`);
   await run(`
     CREATE TABLE IF NOT EXISTS inventory_categories (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -201,12 +201,12 @@ async function initSqlite() {
     )
   `);
 
-  const existing = await all("SELECT id FROM inventory_items WHERE is_deleted = 0 LIMIT 1");
+  const existing = await all("SELECT id FROM inventory WHERE is_deleted = 0 LIMIT 1");
   if (existing.length === 0) {
     const now = nowIso();
     for (const row of seedRows) {
       await run(
-        `INSERT INTO inventory_items
+        `INSERT INTO inventory
          (sku, name, category, cost_price, selling_price, stock, reorder_level, image, shop_code, created_at, updated_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [...row, now, now],
@@ -244,7 +244,7 @@ async function snapshotDb(reason = "manual") {
     const rows = await all(
       `SELECT sku, name, category, cost_price AS "costPrice", selling_price AS "sellingPrice", stock,
               reorder_level AS "reorderLevel", shop_code AS "shopCode", image
-       FROM inventory_items WHERE is_deleted = 0 ORDER BY id DESC`,
+       FROM inventory WHERE is_deleted = 0 ORDER BY id DESC`,
     );
     await fs.promises.writeFile(filePath, JSON.stringify({ exportedAt: nowIso(), items: rows }, null, 2));
     return filePath;
